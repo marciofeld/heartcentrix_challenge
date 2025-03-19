@@ -15,6 +15,8 @@ This project implements a simple API deployed on Amazon EKS (Elastic Kubernetes 
 │   ├── Dockerfile            # Container image definition
 │   ├── app.js                # Node.js Express application
 │   └── package.json          # Node.js dependencies
+├── evidences                 # Folder with printscreen evidences
+├── github                    # Github workflows folder (I had to remove the .)
 ├── k8s                       # Kubernetes manifests
 │   ├── deployment.yaml       # API pod deployment configuration
 │   ├── ingress.yaml          # Ingress for external access via ALB
