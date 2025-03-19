@@ -1,0 +1,22 @@
+➜  ~ curl -v http://k8s-challeng-apiingre-010d6cd20b-8685469.us-east-2.elb.amazonaws.com/api/hello
+* Host k8s-challeng-apiingre-010d6cd20b-8685469.us-east-2.elb.amazonaws.com:80 was resolved.
+* IPv6: (none)
+* IPv4: 18.191.38.202, 3.128.185.156
+*   Trying 18.191.38.202:80...
+* Connected to k8s-challeng-apiingre-010d6cd20b-8685469.us-east-2.elb.amazonaws.com (18.191.38.202) port 80
+> GET /api/hello HTTP/1.1
+> Host: k8s-challeng-apiingre-010d6cd20b-8685469.us-east-2.elb.amazonaws.com
+> User-Agent: curl/8.7.1
+> Accept: */*
+>
+* Request completely sent off
+< HTTP/1.1 200 OK
+< Date: Wed, 19 Mar 2025 04:15:26 GMT
+< Content-Type: text/html; charset=utf-8
+< Content-Length: 6
+< Connection: keep-alive
+< X-Powered-By: Express
+< ETag: W/"6-aTQsXDnlrl8Ad67MMsD4GBH7gZM"
+<
+* Connection #0 to host k8s-challeng-apiingre-010d6cd20b-8685469.us-east-2.elb.amazonaws.com left intact
+Hello!%

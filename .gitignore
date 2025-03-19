@@ -1,0 +1,52 @@
+# Terraform directories
+.terraform/
+.terraform.d/
+
+# Terraform files
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+terraform.tfstate.*.backup
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Terraform variables and plans
+*.tfvars
+*.tfvars.json
+*.auto.tfvars
+*.auto.tfvars.json
+*terraform.plan
+*tfplan*
+
+# Exclude override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Local environment files
+.env
+.envrc
+.terraformrc
+terraform.rc
+
+# Log files
+*.log
+
+# Cloud provider authentication files
+credentials.json
+.aws/
+aws.json
+
+# Editor-specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS-specific files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,127 @@
+name: Deploy to Kubernetes
+
+on:
+  workflow_run:
+    workflows: ["Build and Push API Image"]
+    types:
+      - completed
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy API to Kubernetes
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion != 'failure' }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-2
+
+      - name: Download Terraform Outputs
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-outputs
+          path: .
+        continue-on-error: true
+
+      - name: Download Image Info
+        uses: actions/download-artifact@v4
+        with:
+          name: image-info
+          path: .
+        continue-on-error: true
+
+      - name: Load Environment Variables
+        run: |
+          if [ -f terraform-outputs.env ]; then
+            cat terraform-outputs.env >> $GITHUB_ENV
+          else
+            # If we don't have the artifact, try to get it from Terraform directly
+            cd terraform
+            terraform init -input=false
+            echo "ECR_REPOSITORY_URL=$(terraform output -raw ecr_repository_url)" >> $GITHUB_ENV
+            echo "CLUSTER_NAME=$(terraform output -raw cluster_name)" >> $GITHUB_ENV
+            echo "CLUSTER_REGION=$(terraform output -raw region)" >> $GITHUB_ENV
+            cd ..
+          fi
+          
+          if [ -f image-info.env ]; then
+            cat image-info.env >> $GITHUB_ENV
+          fi
+          
+          # If we don't have image tag info, use latest as fallback
+          if [ -z "$IMAGE_TAGS" ]; then
+            echo "IMAGE_TAG=${ECR_REPOSITORY_URL}:latest" >> $GITHUB_ENV
+          else
+            # Get the first tag from IMAGE_TAGS
+            FIRST_TAG=$(echo $IMAGE_TAGS | awk '{print $1}')
+            echo "IMAGE_TAG=$FIRST_TAG" >> $GITHUB_ENV
+          fi
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Update kube config
+        run: aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.CLUSTER_REGION }}
+
+      - name: Process Kubernetes manifests
+        run: |
+          mkdir -p processed-manifests
+          for file in k8s/*.yaml; do
+            if [ -f "$file" ]; then
+              # Replace variables in the manifest
+              sed "s|\${ECR_REPOSITORY_URL}|${{ env.ECR_REPOSITORY_URL }}|g; s|\${VERSION}|$(echo ${{ env.IMAGE_TAG }} | sed 's|.*:||')|g" "$file" > "processed-manifests/$(basename "$file")"
+              echo "Processed $file"
+            fi
+          done
+
+      - name: Verify Kubernetes manifests
+        run: cat processed-manifests/*.yaml
+
+      - name: Deploy to Kubernetes
+        run: |
+          # Check if namespace exists, create if it doesn't
+          kubectl get namespace challenge-api || kubectl create namespace challenge-api
+          
+          # Apply manifests
+          kubectl apply -f processed-manifests/
+
+      - name: Wait for deployment
+        run: kubectl rollout status deployment/api-deployment -n challenge-api --timeout=180s
+
+      - name: Get Ingress URL
+        run: |
+          echo "Waiting for ALB to be provisioned..."
+          for i in {1..30}; do
+            INGRESS_HOSTNAME=$(kubectl get ingress -n challenge-api api-ingress -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+            if [ -n "$INGRESS_HOSTNAME" ]; then
+              echo "API is available at: http://$INGRESS_HOSTNAME/api/hello"
+              echo "API_URL=http://$INGRESS_HOSTNAME/api/hello" >> $GITHUB_ENV
+              break
+            fi
+            echo "Waiting for ALB... attempt $i/30"
+            sleep 10
+          done
+          
+          if [ -z "$INGRESS_HOSTNAME" ]; then
+            echo "ALB URL not available yet. Check AWS console for ALB status."
+          fi
+
+      - name: Output API URL
+        run: |
+          if [ -n "${{ env.API_URL }}" ]; then
+            echo "API URL: ${{ env.API_URL }}"
+          fi
